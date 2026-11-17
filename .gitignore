@@ -1,0 +1,11 @@
+# Compilacion
+build/
+cmake-build-*/
+
+# Sistema
+.DS_Store
+
+# Editores
+.vscode/
+.idea/
+.vs/
