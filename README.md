@@ -43,5 +43,42 @@ Tiene que terminar con `OK`.
 - [x] Fase 1: proyecto base compilando
 - [x] Fase 2: `Semaforo` y `prueba_semaforo` imprime OK
 - [x] Fase 3: caso 2 con hilos y modo `carrera`
-- [ ] Fase 4: `EXPERIMENTOS.md` con la predicción
-- [ ] Fase 5: etiqueta `hito1`
+- [x] Fase 4: `EXPERIMENTOS.md` con predicción y resultados
+- [x] Fase 5: etiqueta `hito1`
+
+## Estructura final del repositorio
+
+- `base/`: clases auxiliares del profesor (no se tocan).
+- `semaforo/`: nossa clase `Semaforo`. Implementación con mutex + condition_variable.
+- `prueba_semaforo/`: prueba de `Semaforo`. Verifica que no hayan más de 3 hilos simultáneos.
+- `caso/`: nuestra implementación del caso 2 (cocina de restaurante).
+  - `BufferSemaforos`: Buffer 1 con semáforos.
+  - `BufferMonitor`: Buffer 2 con condition variables.
+  - `Cocina`: Clase principal con camareros, cocineros, horno, emplatadores y jefe.
+  - `main.cpp`: Lanza todos los hilos y verifica invariantes.
+  - Modo `--fallo carrera`: Introduce race condition en el horno.
+- `competicion/`: programa de la competición.
+- `ejemplo/`: ejemplo del profesor.
+- `docs/proyecto_base.md`: README original del profesor.
+
+## Cómo compilar y ejecutar
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+```bash
+# Prueba de semáforo
+./build/prueba_semaforo/prueba_semaforo
+
+# Ejecutar caso (versión correcta)
+./build/caso/caso
+
+# Ejecutar caso con modo carrera (rompe invariante)
+./build/caso/caso --fallo carrera
+```
+
+## Uso de IA
+
+Ver `IA.md` para el registro de uso de IA como copiloto (Haiku 5.5, Claude Code).
