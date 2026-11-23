@@ -54,6 +54,11 @@ void Cocina::cocinero(int numero) {
         // Se crea un ciclo de espera circular y el sistema se interbloquea.
         primero = numero;
         segundo = (numero + 1) % COCINEROS;
+        if (_ctx.traza.activa()) {
+            _ctx.traza.evento("cocinero " + std::to_string(numero),
+                              "MODO FALLO: adquiriendo utensilios en orden circular (" +
+                              std::to_string(primero) + " y " + std::to_string(segundo) + ")");
+        }
     } else {
         // VERSIÓN CORRECTA: ORDEN GLOBAL DE RECURSOS (Tema 8).
         // Todos los cocineros adquieren primero el utensilio de menor índice.
@@ -121,6 +126,8 @@ void Cocina::jefe(int limpiezaMs) {
                 // Correcto: el jefe pone el cartel de limpieza ANTES de esperar.
                 // Así ningún plato nuevo entra y el horno se vacía enseguida.
                 _limpiando = true;
+            } else if (_ctx.traza.activa()) {
+                _ctx.traza.evento("jefe", "MODO FALLO inanición: esperando vaciado sin poner _limpiando");
             }
 
             auto t0 = std::chrono::steady_clock::now();
@@ -183,6 +190,9 @@ void Cocina::entrarHorno() {
         // Paso 1: comprobamos si hay plaza libre en una sección crítica.
         // Paso 2: entramos e incrementamos en otra sección crítica separada.
         // En el intervalo entre 1 y 2, otro cocinero se cuela y se supera el límite de plazas.
+        if (_ctx.traza.activa()) {
+            _ctx.traza.evento("cocinero", "MODO FALLO carrera: comprobando plaza fuera de sección crítica atómica");
+        }
         bool hayHueco = false;
         while (!hayHueco) {
             {
@@ -217,6 +227,9 @@ void Cocina::entrarHorno() {
     if (_falloInanicion) {
         // MODO FALLO: INANICIÓN DEL JEFE.
         // Los cocineros ignoran _limpiando; siguen entrando y el jefe espera indefinidamente.
+        if (_ctx.traza.activa()) {
+            _ctx.traza.evento("cocinero", "MODO FALLO inanición: ignorando solicitud de limpieza del jefe");
+        }
         _cvHorno.wait(bloqueo, [this, miTicket] {
             return miTicket == _ticketAtendido && _enHorno < _plazasHorno;
         });
