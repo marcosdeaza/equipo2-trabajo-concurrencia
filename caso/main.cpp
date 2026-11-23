@@ -6,6 +6,7 @@
 #include "Config.h"
 #include "Contexto.h"
 #include "Estadisticas.h"
+#include "Lanzador.h"
 #include "Traza.h"
 #include "Vigilante.h"
 
@@ -57,4 +58,84 @@ bool ejecutarSimulacion(const Config& config, Estadisticas& estadisticas, Traza&
     for (int e = 0; e < emplatadores; ++e) {
         hilosEmplatadores.emplace_back(&Cocina::emplatador, &cocina);
     }
+
+    // =========================================================================
+    // FASE DE CIERRE ORDENADO:
+    // El orden es vital: si esperamos a una etapa antes de que acabe la anterior,
+    // o no avisamos del fin, los hilos se quedarian esperando para siempre.
+    // =========================================================================
+
+    // Paso 1: Esperamos a que todos los camareros hayan terminado de pedir sus comandas.
+    for (auto& t : hilosCamareros) {
+        t.join();
+    }
+
+    // Paso 2: Ya no habra mas comandas normales. Metemos un plato especial FIN_PLATO por cocinero (10).
+    cocina.ponerFinDeComandas();
+
+    // Paso 3: Esperamos a que los cocineros cocinen todo lo pendiente y terminen al ver su FIN_PLATO.
+    for (auto& t : hilosCocineros) {
+        t.join();
+    }
+
+    // Paso 4: Ya no se van a cocinar mas platos. Cerramos el buffer 2 y despertamos a los emplatadores.
+    cocina.cerrarSalida();
+
+    // Paso 5: Esperamos a que los emplatadores terminen de vaciar el buffer 2 y salgan.
+    for (auto& t : hilosEmplatadores) {
+        t.join();
+    }
+
+    // Paso 6: Pedimos al jefe de cocina que pare sus rondas de limpieza y esperamos a que termine.
+    cocina.pararJefe();
+    hiloJefe.join();
+
+    // Paso 7: La simulación ha terminado con éxito, paramos el vigilante.
+    vigilante.detener();
+
+    // =========================================================================
+    // REGISTRO DE MÉTRICAS ADICIONALES (OCUPACIÓN MEDIA):
+    // Como Estadisticas::sumar solo admite enteros, guardamos la media en centésimas (x100).
+    // Ejemplo: valor 385 significa una ocupación media de 3.85 platos.
+    // =========================================================================
+    long media1Cent = std::lround(cocina.ocupacionMediaBuffer1() * 100.0);
+    long media2Cent = std::lround(cocina.ocupacionMediaBuffer2() * 100.0);
+    estadisticas.sumar("ocupación media buffer 1 (x100)", media1Cent);
+    estadisticas.sumar("ocupación media buffer 2 (x100)", media2Cent);
+
+    // =========================================================================
+    // COMPROBACION DE INVARIANTES FINALES:
+    // Verificamos que los numeros cuadren exactamente y no se haya perdido nada.
+    // =========================================================================
+    long pedidos = estadisticas.valor("platos pedidos");
+    long emplatados = estadisticas.valor("platos emplatados");
+    long esperado = static_cast<long>(camareros) * comandas;
+
+    // Invariante 1: los platos pedidos deben coincidir con camareros x comandas.
+    if (pedidos != esperado) {
+        estadisticas.violacion("platos pedidos = " + std::to_string(pedidos) + ", esperado " +
+                               std::to_string(esperado));
+    }
+
+    // Invariante 2: todos los platos pedidos deben haber sido emplatados sin faltar ninguno.
+    if (emplatados != pedidos) {
+        estadisticas.violacion("platos emplatados = " + std::to_string(emplatados) + ", pedidos " +
+                               std::to_string(pedidos));
+    }
+
+    // Devuelve true si no hubo ninguna violacion de invariantes.
+    return estadisticas.sinViolaciones();
+}
+
+int main(int argc, char* argv[]) {
+    // Lee los argumentos pasados por terminal (--clave valor).
+    Config config(argc, argv);
+
+    // Configuramos el Lanzador con las opciones permitidas y los tres modos de fallo.
+    Lanzador lanzador("caso",
+                      {"camareros", "comandas", "cola", "plazas_horno", "emplatadores", "limpieza"},
+                      {"carrera", "interbloqueo", "inanicion"});
+
+    // Ejecuta la simulacion (gestiona --estres N, imprime resultados y devuelve codigo 0 o 1).
+    return lanzador.ejecutar(config, ejecutarSimulacion);
 }
